@@ -11,7 +11,7 @@ app.use(cors());
 
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5q2fm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -47,10 +47,76 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/articles", async (req, res) => {
+      const result = await articlesCollection.find().toArray();
+      res.send(result);
+    });
+
     app.post("/articles", async (req, res) => {
       const articleData = req.body;
       console.log(articleData);
       const result = await articlesCollection.insertOne(articleData);
+      res.send(result);
+    });
+
+    app.get("/articles/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await articlesCollection.findOne(filter);
+      res.send(result);
+    });
+
+    app.patch("/approveArticles/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const filter = { _id: new ObjectId(id) };
+
+      const updatedDoc = {
+        $set: {
+          status: "approved",
+        },
+      };
+      const result = await articlesCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.patch("/declineArticles/:id", async (req, res) => {
+      const id = req.params.id;
+      const declineArticle = req.body;
+      console.log(id, declineArticle);
+
+      const filter = { _id: new ObjectId(id) };
+
+      const updatedDoc = {
+        $set: {
+          status: declineArticle.status,
+          declineReason: declineArticle.declineReason,
+        },
+      };
+
+      const result = await articlesCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.patch("/makePremium/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          isPremium: true,
+        },
+      };
+      const result = await articlesCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    app.delete("/articles/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const filter = { _id: new ObjectId(id) };
+
+      const result = await articlesCollection.deleteOne(filter);
       res.send(result);
     });
 
