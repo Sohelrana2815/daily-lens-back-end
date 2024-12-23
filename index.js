@@ -52,6 +52,13 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/approvedArticles", async (req, res) => {
+      const status = req.query;
+      const filter = status;
+      const result = await articlesCollection.find(filter).toArray();
+      res.send(result);
+    });
+
     app.post("/articles", async (req, res) => {
       const articleData = req.body;
       console.log(articleData);
