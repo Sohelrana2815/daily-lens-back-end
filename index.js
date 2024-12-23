@@ -36,29 +36,40 @@ async function run() {
       .db("DAILY_LENS_DB")
       .collection("publishers");
 
+    // Get publishers data
     app.get("/publishers", async (req, res) => {
       const result = await publishersCollection.find().toArray();
       res.send(result);
     });
-
+    // Post publisher data
     app.post("/publishers", async (req, res) => {
       const publisher = req.body;
       const result = await publishersCollection.insertOne(publisher);
       res.send(result);
     });
 
+    // Get all posted articles data (Admin)
     app.get("/articles", async (req, res) => {
       const result = await articlesCollection.find().toArray();
       res.send(result);
     });
 
+    // Only get articles approved by admin
     app.get("/approvedArticles", async (req, res) => {
       const status = req.query;
+      console.log(status);
       const filter = status;
       const result = await articlesCollection.find(filter).toArray();
       res.send(result);
     });
-
+    // Get specific approved article
+    app.get("/approvedArticles/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await articlesCollection.findOne(filter);
+      res.send(result);
+    });
+    // Post articles
     app.post("/articles", async (req, res) => {
       const articleData = req.body;
       console.log(articleData);
@@ -66,6 +77,7 @@ async function run() {
       res.send(result);
     });
 
+    // Get specific articles
     app.get("/articles/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -73,6 +85,7 @@ async function run() {
       res.send(result);
     });
 
+    // Approved specific article by admin
     app.patch("/approveArticles/:id", async (req, res) => {
       const id = req.params.id;
 
@@ -86,7 +99,7 @@ async function run() {
       const result = await articlesCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
-
+    // Decline specific article by admin
     app.patch("/declineArticles/:id", async (req, res) => {
       const id = req.params.id;
       const declineArticle = req.body;
@@ -104,7 +117,7 @@ async function run() {
       const result = await articlesCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
-
+    // Make an article premium by admin
     app.patch("/makePremium/:id", async (req, res) => {
       const id = req.params.id;
 
@@ -117,7 +130,7 @@ async function run() {
       const result = await articlesCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
-
+    // Delete an specific article by admin
     app.delete("/articles/:id", async (req, res) => {
       const id = req.params.id;
 
