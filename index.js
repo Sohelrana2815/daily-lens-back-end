@@ -56,19 +56,44 @@ async function run() {
 
     // Only get articles approved by admin
     app.get("/approvedArticles", async (req, res) => {
-      const status = req.query;
-      console.log(status);
-      const filter = status;
+      const filter = { status: "approved" };
       const result = await articlesCollection.find(filter).toArray();
       res.send(result);
     });
+
     // Get specific approved article
     app.get("/approvedArticles/:id", async (req, res) => {
       const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
+      const filter = { _id: new ObjectId(id), status: "approved" };
       const result = await articlesCollection.findOne(filter);
       res.send(result);
     });
+    // Increment view count for approved articles
+
+    app.patch("/approvedArticles/:id/view", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id), status: "approved" };
+      const update = { $inc: { views: 1 } }; // Increment view count by 1
+      const result = await articlesCollection.updateOne(filter, update);
+      if (result.modifiedCount === 0) {
+        return res
+          .status(404)
+          .json({ message: "Article not found or not approved" });
+      }
+
+      res.send({ message: "View count updated successfully" });
+    });
+
+    // Get 6 trending articles by views in descending order
+    app.get("/trendingArticles", async (req, res) => {
+      const result = await articlesCollection
+        .find({ status: "approved" })
+        .sort({ views: -1 })
+        .limit(6)
+        .toArray();
+      res.send(result);
+    });
+
     // Post articles
     app.post("/articles", async (req, res) => {
       const articleData = req.body;
