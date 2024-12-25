@@ -35,6 +35,40 @@ async function run() {
     const publishersCollection = client
       .db("DAILY_LENS_DB")
       .collection("publishers");
+    const usersCollection = client.db("DAILY_LENS_DB").collection("users");
+
+    // Post user info
+
+    app.get("/users", async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.post("/users", async (req, res) => {
+      const userData = req.body;
+      console.log(userData);
+      const result = await usersCollection.insertOne(userData);
+      res.send(result);
+    });
+
+    app.get("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await usersCollection.findOne(filter);
+      res.send(result);
+    });
+    app.patch("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const filter = { email };
+      const currentTime = new Date();
+      const updatedDoc = {
+        $set: {
+          loggedInDate: currentTime,
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
     // Get publishers data
     app.get("/publishers", async (req, res) => {
