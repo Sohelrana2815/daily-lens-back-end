@@ -205,6 +205,25 @@ async function run() {
       });
     });
 
+    // post subscription expire date after payment
+
+    app.patch("/userSubscriptionInfo/:email", async (req, res) => {
+      const { subscriptionInfo } = req.body;
+      console.log(subscriptionInfo);
+      const email = req.params.email;
+
+      const filter = { email };
+      const updatedDoc = {
+        $set: {
+          amount: subscriptionInfo.price,
+          premiumExpires: subscriptionInfo.period,
+        },
+      };
+
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
     console.log(
