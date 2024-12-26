@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 require("dotenv").config();
+const strip = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 
@@ -55,18 +56,6 @@ async function run() {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const result = await usersCollection.findOne(filter);
-      res.send(result);
-    });
-    app.patch("/users/:email", async (req, res) => {
-      const email = req.params.email;
-      const filter = { email };
-      const currentTime = new Date();
-      const updatedDoc = {
-        $set: {
-          loggedInDate: currentTime,
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
 
@@ -197,6 +186,23 @@ async function run() {
 
       const result = await articlesCollection.deleteOne(filter);
       res.send(result);
+    });
+
+    // Payment intent
+
+    app.post("/create-payment-intent", async (req, res) => {
+      const { packagePrice } = req.body;
+      // console.log(packagePrice);
+      const price = parseInt(packagePrice.price * 100);
+      // console.log(price);
+      const paymentIntent = await strip.paymentIntents.create({
+        amount: price,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
 
     // Send a ping to confirm a successful connection
