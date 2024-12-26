@@ -1,4 +1,5 @@
 const express = require("express");
+const cron = require("node-cron");
 const app = express();
 const cors = require("cors");
 require("dotenv").config();
@@ -36,7 +37,34 @@ async function run() {
     const publishersCollection = client
       .db("DAILY_LENS_DB")
       .collection("publishers");
+
     const usersCollection = client.db("DAILY_LENS_DB").collection("users");
+
+    // Cron job to handle subscription expiration
+
+    cron.schedule("* * * * *", async () => {
+      console.log("Running subscription expiration check");
+
+      try {
+        const currentTime = new Date();
+        // Filter expired subscription
+
+        const filter = { subscriptionPeriod: { $lte: currentTime } };
+
+        // Reset fields for expired users
+
+        const updatedDoc = {
+          $set: {
+            subscriptionPeriod: null,
+            amount: 0,
+          },
+        };
+        const result = await usersCollection.updateMany(filter, updatedDoc);
+        console.log(`Updated ${result.modifiedCount} users to normal status.`);
+      } catch (error) {
+        console.error("Error updating expired subscription:", error);
+      }
+    });
 
     // Post user info
 
@@ -205,23 +233,53 @@ async function run() {
       });
     });
 
-    // post subscription expire date after payment
+    // patch subscription expire date after payment
 
     app.patch("/userSubscriptionInfo/:email", async (req, res) => {
       const { subscriptionInfo } = req.body;
       console.log(subscriptionInfo);
       const email = req.params.email;
 
+      // Get the current time
+
+      const currentTime = new Date();
+      let subscriptionExpires;
+
+      // Calculate expiration time based on the period
+
+      switch (subscriptionInfo.period) {
+        case "1minute":
+          subscriptionExpires = new Date(currentTime.getTime() + 1 * 60 * 1000); // Add 1 minute
+          break;
+
+        case "5days":
+          subscriptionExpires = new Date(
+            currentTime.getTime() + 5 * 24 * 3600 * 1000
+          ); // Add 5 days
+          break;
+        case "10days":
+          subscriptionExpires = new Date(
+            currentTime.getTime() + 10 * 24 * 3600 * 1000
+          );
+          break;
+        default:
+          return res.status(400).send({ error: "Invalid subscription period" });
+      }
+
       const filter = { email };
+
       const updatedDoc = {
         $set: {
           amount: subscriptionInfo.price,
-          premiumExpires: subscriptionInfo.period,
+          subscriptionPeriod: subscriptionExpires,
         },
       };
-
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
+      try {
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to update user subscription" });
+      }
     });
 
     // Send a ping to confirm a successful connection
