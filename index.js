@@ -3,18 +3,30 @@ const cron = require("node-cron");
 const app = express();
 const cors = require("cors");
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
 const strip = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 
 // Middleware
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://daily-lens-90dd8.web.app",
+      "https://daily-lens-90dd8.firebaseapp.com",
+    ],
+  })
+);
 
 app.use(express.json());
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5q2fm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
+// const uri = "mongodb://localhost:27017";
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -66,28 +78,49 @@ async function run() {
       }
     });
 
-    // Post user info
-
+    // Users data
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
-
-    app.post("/users", async (req, res) => {
-      const userData = req.body;
-      console.log(userData);
-      const result = await usersCollection.insertOne(userData);
-      res.send(result);
-    });
-
+    // Get Specific user data
     app.get("/users/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const result = await usersCollection.findOne(filter);
       res.send(result);
     });
+    // Post user data
+    app.post("/users", async (req, res) => {
+      const userData = req.body;
 
-    // Get publishers data
+      const query = { email: userData.email };
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({
+          message: "This user is already exist!",
+          insertedId: null,
+        });
+      }
+
+      const result = await usersCollection.insertOne(userData);
+      res.send(result);
+    });
+
+    app.patch("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          isAdmin: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // Publisher
+
     app.get("/publishers", async (req, res) => {
       const result = await publishersCollection.find().toArray();
       res.send(result);
@@ -105,9 +138,64 @@ async function run() {
       res.send(result);
     });
 
+    // Get user posted articles
+    app.get("/myArticles", async (req, res) => {
+      const authorEmail = req.query.authorEmail;
+      const filter = { authorEmail };
+      console.log(filter);
+      const result = await articlesCollection.find(filter).toArray();
+      res.send(result);
+    });
+
+    //  Get specific article by _id
+
+    app.get("/myArticles/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const filter = { _id: new ObjectId(id) };
+
+      const result = await articlesCollection.findOne(filter);
+
+      res.send(result);
+    });
+
+    app.patch("/myArticles/:id", async (req, res) => {
+      const id = req.params.id;
+      const myArticle = req.body;
+      console.log(myArticle);
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          articleTitle: myArticle.articleTitle,
+          articleDescription: myArticle.articleDescription,
+          articleImage: myArticle.articleImage,
+          publisherName: myArticle.publisherName,
+          articleTags: myArticle.articleTags,
+        },
+      };
+      const result = await articlesCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // Delete article
+
+    app.delete("/myArticles/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await articlesCollection.deleteOne(filter);
+      res.send(result);
+    });
+
     // Only get articles approved by admin
     app.get("/approvedArticles", async (req, res) => {
       const filter = { status: "approved" };
+      const result = await articlesCollection.find(filter).toArray();
+      res.send(result);
+    });
+
+    // GET approve articles and premium articles
+    app.get("/premiumArticles", async (req, res) => {
+      const filter = { isPremium: true, status: "approved" };
       const result = await articlesCollection.find(filter).toArray();
       res.send(result);
     });
