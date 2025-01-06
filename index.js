@@ -77,7 +77,7 @@ async function run() {
           return res.status(401).send({ message: "Unauthorized" });
         }
         req.decoded = decoded;
-        next(D);
+        next();
       });
     };
 
@@ -108,10 +108,28 @@ async function run() {
     });
 
     // Users data
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+
+    // Check admin
+
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
+
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.isAdmin === "admin";
+      }
+      res.send({ admin });
+    });
+
     // Get Specific user data
     app.get("/users/:id", async (req, res) => {
       const id = req.params.id;
@@ -168,7 +186,7 @@ async function run() {
     });
 
     // Get user posted articles
-    app.get("/myArticles", async (req, res) => {
+    app.get("/myArticles", verifyToken, async (req, res) => {
       const authorEmail = req.query.authorEmail;
       const filter = { authorEmail };
       console.log(filter);
