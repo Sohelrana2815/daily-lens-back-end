@@ -81,8 +81,6 @@ async function run() {
       });
     };
 
-    // Cron job to handle subscription expiration
-
     cron.schedule("* * * * *", async () => {
       console.log("Running subscription expiration check");
 
@@ -108,26 +106,13 @@ async function run() {
     });
 
     // Users data
-    app.get("/users", verifyToken, async (req, res) => {
+    app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
 
-    // Check admin
-
-    app.get("/users/admin/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      if (email !== req.decoded.email) {
-        return res.status(403).send({ message: "Forbidden Access" });
-      }
-
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      let admin = false;
-      if (user) {
-        admin = user?.isAdmin === "admin";
-      }
-      res.send({ admin });
+    app.get("/is-admin", (req, res) => {
+      res.send({ isAdmin: true });
     });
 
     // Get Specific user data
@@ -187,6 +172,8 @@ async function run() {
 
     // Get user posted articles
     app.get("/myArticles", verifyToken, async (req, res) => {
+      // const token = req.decoded;
+      // // console.log("token in the my article", token);
       const authorEmail = req.query.authorEmail;
       const filter = { authorEmail };
       console.log(filter);
