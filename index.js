@@ -223,23 +223,6 @@ async function run() {
       res.send({ message: "View count updated successfully" });
     });
 
-    // search articles by title
-    app.get("/searchArticles", async (req, res) => {
-      const searchTerm = req.query.title;
-      if (!searchTerm) {
-        return res.status(400).send({ error: "Search term is required" });
-      }
-
-      try {
-        const filter = { articleTitle: { $regex: searchTerm, $options: "i" } }; // Case-insensitive search
-        const result = await articlesCollection.find(filter).toArray();
-        res.send(result);
-      } catch (error) {
-        console.error("Error searching articles:", error);
-        return res.status(500).send({ error: "Failed to search articles" });
-      }
-    });
-
     // Get 6 trending articles by views in descending order
     app.get("/trendingArticles", async (req, res) => {
       const result = await articlesCollection
