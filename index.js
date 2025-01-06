@@ -52,6 +52,35 @@ async function run() {
 
     const usersCollection = client.db("DAILY_LENS_DB").collection("users");
 
+    // jwt related api
+
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+
+      res.send({ token });
+    });
+
+    // Middleware
+
+    const verifyToken = (req, res, next) => {
+      if (!req.headers.authorization) {
+        console.log("token", req.headers);
+        return res.status(401).send({ message: "Unauthorized Access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "Unauthorized" });
+        }
+        req.decoded = decoded;
+        next(D);
+      });
+    };
+
     // Cron job to handle subscription expiration
 
     cron.schedule("* * * * *", async () => {
