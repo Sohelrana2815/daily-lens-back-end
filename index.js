@@ -64,7 +64,7 @@ async function run() {
       res.send({ token });
     });
 
-    // Middleware
+    // Middleware (Verify Token)
 
     const verifyToken = (req, res, next) => {
       if (!req.headers.authorization) {
@@ -79,6 +79,22 @@ async function run() {
         req.decoded = decoded;
         next();
       });
+    };
+    // Middleware (Verify Admin)
+
+    const verifyAdmin = async (req, res, next) => {
+      try {
+        const email = req.decoded.email; // Get verified email from JWT middleware
+        const user = await usersCollection.findOne({ email });
+        if (!user || user.isAdmin !== "admin") {
+          return res
+            .status(403)
+            .send({ message: "Access Denied. Admins only." });
+        }
+        next(); // User is an admin, now proceed to the next middleware/route
+      } catch (error) {
+        res.status(500).send({ message: "Internal Server Error", error });
+      }
     };
 
     cron.schedule("* * * * *", async () => {
@@ -106,15 +122,14 @@ async function run() {
     });
 
     // Users data
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
-
-    app.get("/is-admin", (req, res) => {
-      res.send({ isAdmin: true });
+    app.get("/users-home", async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result);
     });
-
     // Get Specific user data
     app.get("/users/:id", async (req, res) => {
       const id = req.params.id;
@@ -158,7 +173,7 @@ async function run() {
       res.send(result);
     });
     // Post publisher data
-    app.post("/publishers", async (req, res) => {
+    app.post("/publishers", verifyToken, verifyAdmin, async (req, res) => {
       const publisher = req.body;
       const result = await publishersCollection.insertOne(publisher);
       res.send(result);
