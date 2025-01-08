@@ -66,15 +66,18 @@ async function run() {
 
     // Middleware (Verify Token)
 
-    const verifyToken = (req, res, next) => {
-      if (!req.headers.authorization) {
+    const verifyToken = async (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
         console.log("token", req.headers);
-        return res.status(401).send({ message: "Unauthorized Access" });
+        return res
+          .status(401)
+          .send({ message: "Token missing or unauthorized" });
       }
       const token = req.headers.authorization.split(" ")[1];
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
         if (err) {
-          return res.status(401).send({ message: "Unauthorized" });
+          return res.status(401).send({ message: "Invalid or expired token" });
         }
         req.decoded = decoded;
         next();
@@ -83,20 +86,78 @@ async function run() {
     // Middleware (Verify Admin)
 
     const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.isAdmin === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "Access Denied. Admins only." });
+      }
+      next();
+    };
+
+    // Middleware (Verify Premium users)
+
+    const verifyPremium = async (req, res, next) => {
       try {
-        const email = req.decoded.email; // Get verified email from JWT middleware
-        const user = await usersCollection.findOne({ email });
-        if (!user || user.isAdmin !== "admin") {
-          return res
-            .status(403)
-            .send({ message: "Access Denied. Admins only." });
+        const email = req.decoded.email;
+        const query = { email: email };
+        const user = await usersCollection.findOne(query);
+
+        if (!user) {
+          return res.status(404).send({ message: "User not found" });
         }
-        next(); // User is an admin, now proceed to the next middleware/route
+
+        // Check if the user's subscription is active
+        if (
+          !user.subscriptionPeriod ||
+          new Date(user.subscriptionPeriod) < new Date()
+        ) {
+          return res.status(403).send({
+            message: "Access denied: Subscription expired or not active",
+          });
+        }
+
+        // User is verified and has an active subscription
+        next();
       } catch (error) {
-        res.status(500).send({ message: "Internal Server Error", error });
+        console.error("Error in verifyPremium middleware:", error.message);
+        res.status(500).send({ message: "Internal server error" });
       }
     };
 
+    // check admin
+
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(401).send({ message: "Forbidden Access" });
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let isAdmin = false;
+      if (user) {
+        isAdmin = user?.isAdmin === "admin";
+      }
+      res.send({ isAdmin });
+    });
+
+    // check for subscription status
+
+    app.get("/users/subscription/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const user = await usersCollection.findOne({ email });
+      if (!user || !user.subscriptionPeriod) {
+        return res.send({ isPremium: false });
+      }
+
+      const currentDate = new Date();
+      const subscriptionEndDate = new Date(user.subscriptionPeriod);
+      if (subscriptionEndDate > currentDate) {
+        return res.send({ isPremium: true });
+      }
+      res.send({ isPremium: false });
+    });
     cron.schedule("* * * * *", async () => {
       console.log("Running subscription expiration check");
 
@@ -122,14 +183,17 @@ async function run() {
     });
 
     // Users data
-    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+
+    // Showing users data in home page
     app.get("/users-home", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+
     // Get Specific user data
     app.get("/users/:id", async (req, res) => {
       const id = req.params.id;
@@ -180,7 +244,7 @@ async function run() {
     });
 
     // Get all posted articles data (Admin)
-    app.get("/articles", async (req, res) => {
+    app.get("/articles", verifyToken, verifyAdmin, async (req, res) => {
       const result = await articlesCollection.find().toArray();
       res.send(result);
     });
@@ -243,11 +307,16 @@ async function run() {
     });
 
     // GET approve articles and premium articles
-    app.get("/premiumArticles", async (req, res) => {
-      const filter = { isPremium: true, status: "approved" };
-      const result = await articlesCollection.find(filter).toArray();
-      res.send(result);
-    });
+    app.get(
+      "/premiumArticles",
+      verifyToken,
+      verifyPremium,
+      async (req, res) => {
+        const filter = { isPremium: true, status: "approved" };
+        const result = await articlesCollection.find(filter).toArray();
+        res.send(result);
+      }
+    );
 
     // Get specific approved article
     app.get("/approvedArticles/:id", async (req, res) => {
