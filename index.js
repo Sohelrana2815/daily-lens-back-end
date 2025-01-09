@@ -26,8 +26,6 @@ app.use(express.json());
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5q2fm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// const uri = "mongodb://localhost:27017";
-
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
@@ -245,8 +243,23 @@ async function run() {
 
     // Get all posted articles data (Admin)
     app.get("/articles", verifyToken, verifyAdmin, async (req, res) => {
-      const result = await articlesCollection.find().toArray();
-      res.send(result);
+      const page = parseInt(req.query.page) || 1; // Default to page 1
+      const limit = parseInt(req.query.limit) || 3; // Default to 3 articles
+      const skip = (page - 1) * limit;
+
+      const totalArticles = await articlesCollection.estimatedDocumentCount(); // Total number of articles
+
+      const articles = await articlesCollection
+        .find()
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      res.send({
+        articles,
+        currentPage: page,
+        totalPages: Math.ceil(totalArticles / limit),
+      });
     });
 
     // Get user posted articles
