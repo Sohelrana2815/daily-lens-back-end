@@ -242,7 +242,7 @@ async function run() {
     });
 
     // Get all posted articles data (Admin)
-    app.get("/articles", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/articles", async (req, res) => {
       const page = parseInt(req.query.page) || 1; // Default to page 1
       const limit = parseInt(req.query.limit) || 3; // Default to 3 articles
       const skip = (page - 1) * limit;
@@ -261,6 +261,18 @@ async function run() {
         totalPages: Math.ceil(totalArticles / limit),
       });
     });
+
+    // Get all posted articles for showing in analytics page
+
+    app.get(
+      "/analyticsArticles",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const result = await articlesCollection.find().toArray();
+        res.send(result);
+      }
+    );
 
     // Get user posted articles
     app.get("/myArticles", verifyToken, async (req, res) => {
